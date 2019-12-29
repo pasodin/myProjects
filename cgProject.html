@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NimaAlaghebandCGProject</title>
+    <style>
+
+        body {
+        @include display(flex);
+        @include align-content(center);
+            color: #353535;
+            min-height: 100vh;
+            font-family: 'Open Sans', sans-serif;
+            font-size: 4px;
+            text-align: center;
+            background-color: lightgreen;
+            margin: 0 auto;
+            overflow: hidden;
+
+        }
+
+        #web-gl {
+            height: 100%;
+            width: 100%;
+        }
+
+    </style>
+
+
+</head>
+<body>
+<script src="lib/three.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/FirstPersonControls.js"></script>
+<script src="lib/Detector.js"></script>
+<script type="text/javascript" src="lib/TrackballControls.js"></script>
+<script src="lib/THREEx.KeyboardState.js"></script>
+<script type="text/javascript" src="lib/DragControls.js"></script>
+<!--<script src="js/Stats.js"></script>-->
+
+
+<div id="web-gl"></div>
+
+<script>
+    var container;
+    var camera, controls, scene, renderer;
+    var light, ambientLight;
+    var audioLoader;
+
+    var delta;
+    var clock = new THREE.Clock();
+
+    //  Particle Variables
+    var particles, geometry, materials = [], parameters, i, h, color, sprite, size;
+
+
+    var mario;
+    var keyboard = new THREEx.KeyboardState();
+
+    //Colision Variables
+    var pos;
+    var MovingCube;
+    var collidableMeshList = [];
+    var arrowList = [];
+    var directionList = [];
+
+
+    //WINNING SOUND Variables
+    var audio = document.createElement('audio');
+    var source = document.createElement('source');
+    source.src = 'cheering.mp3';
+    audio.appendChild(source);
+
+
+    init();
+    animate();
+
+    function init() {
+
+        container = document.getElementById("web-gl");
+        scene = new THREE.Scene();
+
+        //CAMERA
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.02, 10000);
+        camera.position.set(0, 1200, 400);
+        camera.lookAt(scene.position);
+
+
+
+        //SKYBOX
+        var reflectionCube = new THREE.CubeTextureLoader()
+            .setPath('skybox/')
+            .load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
+        reflectionCube.format = THREE.RGBFormat;
+        scene.background = reflectionCube;
+
+
+        //SURFACE
+        var surface = new THREE.PlaneGeometry(1300,1350,100,100);
+        var surfaceMaterial = new THREE.MeshBasicMaterial({color: 0x3452eb, side: THREE.DoubleSide, wireframe: true});
+        var surfaceMesh = new THREE.Mesh(surface, surfaceMaterial);
+        surfaceMesh.rotateX(Math.PI / 2);
+        surfaceMesh.position.y = -50;
+        scene.add(surfaceMesh);
+
+
+        //LIGHT
+        ambientLight = new THREE.AmbientLight(0xffffff);
+        scene.add(ambientLight);
+
+        //FOG
+        scene.fog = new THREE.FogExp2( 0xffffff, 0.0012 );
+
+
+        //DONT KNOW
+                var listener = new THREE.AudioListener();
+                camera.add( listener );
+         audioLoader = new THREE.AudioLoader();
+                light = new THREE.DirectionalLight( 0xffffff );
+                light.position.set( 0, 0.5, 1 ).normalize();
+                scene.add( light );
+
+        //SOUND
+        crying = new THREE.PositionalAudio(listener);
+        audioLoader.load('crying.mp3',function (buffer) {
+           crying.setBuffer( buffer );
+            crying.setRefDistance( 10 );
+            crying.loop=true;
+            crying.play();
+        });
+
+
+        //WOLF
+        var loader = new THREE.ObjectLoader();
+        loader.load("low-poly-fox-by-pixelmannen.json",
+            function ( obj ) {
+            obj.position.z=610;
+            obj.position.y=-50;
+            obj.add(crying);
+            scene.add( obj );
+            }
+        );
+
+
+        //MOVINGCUBE
+        var cubeGeometry = new THREE.CubeGeometry(40, 40, 40, 1, 1, 1);
+        var wireMaterial = new THREE.MeshBasicMaterial({color: 0xff0000, wireframe: true, opacity:0.0, transparent:true});
+        MovingCube = new THREE.Mesh(cubeGeometry, wireMaterial);
+        MovingCube.position.Z=610;
+        MovingCube.position.y=-10;
+        MovingCube.position.x=0;
+        scene.add(MovingCube);
+
+        //MARIO
+        var marioLoader = new THREE.ObjectLoader();
+        marioLoader.load("mario-sculpture.json",
+            function ( obj ) {
+                mario=obj;
+                MovingCube.add(mario);
+            }
+        );
+
+
+        //SNOW
+        geometry = new THREE.Geometry();
+        var textureLoader = new THREE.TextureLoader();
+        sprite1 = textureLoader.load("texture/snowflake1.png");
+        sprite2 = textureLoader.load("texture/snowflake2.png");
+        sprite3 = textureLoader.load("texture/snowflake3.png");
+        sprite4 = textureLoader.load("texture/snowflake4.png");
+        sprite5 = textureLoader.load("texture/snowflake5.png");
+        sprite6 = textureLoader.load("texture/snow.png");
+        for (i = 0; i < 4000; i++) {
+            var vertex = new THREE.Vector3();
+            vertex.x = Math.random() * 2000 - 1000;
+            vertex.y = Math.random() * 2000 - 1000;
+            vertex.z = Math.random() * 2000 - 1000;
+            geometry.vertices.push(vertex);
+        }
+        parameters = [
+            // [[Color in HSL], texture, size
+            [[1.0, 0.2, 0.5], sprite2, 1],
+            [[0.95, 0.1, 0.5], sprite3, 2],
+            [[0.90, 0.05, 0.5], sprite1, 3],
+            [[0.85, 0, 0.5], sprite5, 1.5],
+            [[0.80, 0, 0.5], sprite4, 2.5],
+            [[0.75, 0, 0.5], sprite6,3.5]
+        ];
+        for (i = 0; i < parameters.length; i++) {
+            color = parameters[i][0];
+            sprite = parameters[i][1];
+            size = parameters[i][2];
+            materials[i] = new THREE.PointsMaterial({
+                size: size,
+                map: sprite,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                transparent: true
+            });
+            materials[i].color.setHSL(color[0], color[1], color[2]);
+            particles = new THREE.Points(geometry, materials[i]);
+            particles.rotation.x = Math.random() * 6;
+            particles.rotation.y = Math.random() * 6;
+            particles.rotation.z = Math.random() * 6;
+            scene.add(particles);
+        }
+
+        //DONTKNOW
+            renderer = new THREE.WebGLRenderer({ antialias: true});
+        renderer.setClearColor(new THREE.Color(0x000000));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+
+        //  Sphere x
+        sphereGeometry = new THREE.SphereGeometry(50, 50, 50);
+        material_sphereX = new THREE.MeshPhongMaterial({color: 0xffaa00, shading: THREE.FlatShading, shininess: 0});
+        sphereX = new THREE.Mesh(sphereGeometry, material_sphereX);
+        sphereX.position.z = (Math.random()*1000)-500;
+        sphereX.position.x = (Math.random()*1000)-500;
+        sphereX.position.y=1500;
+        scene.add(sphereX);
+        collidableMeshList.push(sphereX);
+
+        //  Sphere y
+        material_sphereY = new THREE.MeshPhongMaterial({color: 0x00ffaa, shading: THREE.FlatShading, shininess: 0});
+        sphereY = new THREE.Mesh(sphereGeometry, material_sphereY);
+        sphereY.position.z = (Math.random()*1000)-500;
+        sphereY.position.x = (Math.random()*1000)-500;
+        sphereY.position.y=3000;
+        scene.add(sphereY);
+        collidableMeshList.push(sphereY);
+
+        //  Sphere z
+        material_sphereZ = new THREE.MeshPhongMaterial({color: 0xaa00ff, shading: THREE.FlatShading, shininess: 0});
+        sphereZ = new THREE.Mesh(sphereGeometry, material_sphereZ);
+        sphereZ.position.z = (Math.random()*1000)-500;
+        sphereZ.position.x = (Math.random()*1000)-500;
+        sphereZ.position.y=4500;
+        scene.add(sphereZ);
+        collidableMeshList.push(sphereZ);
+
+        //CONTROLS
+        //OrbitControl
+        controls = new THREE.OrbitControls( camera, renderer.domElement );
+        controls.target = new THREE.Vector3(0, 13, 0);
+        controls.addEventListener('change', render);
+        //firstpersoncontrol
+        // controls = new THREE.FirstPersonControls( camera, renderer.domElement );
+        //  controls.movementSpeed = 100;
+        //  controls.lookSpeed = 0.05;
+        //  controls.noFly = true;
+         // controls.lookVertical = false;
+        window.addEventListener('resize', onWindowResize, false);
+
+    }
+
+    function appendText(txt) {
+        document.getElementById('message').innerHTML += txt;
+    }
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+       // controls.handleResize();
+
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        render();
+
+        delta = clock.getDelta();
+
+        var t = (Date.now() / 50000);
+        for (i = 0; i < scene.children.length; i++) {
+
+            var object = scene.children[i];
+            if (object instanceof THREE.Points) {
+                object.rotation.y = t * ( i < 400 ? i + 1 : -( i + 1 ) );
+            }
+        }
+
+        //MOVINGMRMARIO
+        var moveDistance = 200 * delta; // 200 pixels per second
+        var rotateAngle = Math.PI / 2 * delta;   // pi/2 radians (90 degrees) per second
+        if (keyboard.pressed("K"))
+            MovingCube.rotation.y += rotateAngle;
+        if (keyboard.pressed("L"))
+            MovingCube.rotation.y -= rotateAngle;
+        if (keyboard.pressed("A"))
+            MovingCube.position.x -= moveDistance;
+        if (keyboard.pressed("D"))
+            MovingCube.position.x += moveDistance;
+        if (keyboard.pressed("W"))
+            MovingCube.position.z -= moveDistance;
+        if (keyboard.pressed("S"))
+            MovingCube.position.z += moveDistance;
+
+        sphereX.position.y-=(moveDistance/4);
+        sphereY.position.y-=(moveDistance/4);
+        sphereZ.position.y-=(moveDistance/4);
+
+        var originPoint = MovingCube.position.clone();
+        for (var vertexIndex = 0; vertexIndex < MovingCube.geometry.vertices.length; vertexIndex++) {
+            var localVertex = MovingCube.geometry.vertices[vertexIndex].clone();
+            var globalVertex = localVertex.applyMatrix4(MovingCube.matrix);
+            var directionVector = globalVertex.sub(MovingCube.position);
+            var ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize());
+            var collisionResults = ray.intersectObjects(collidableMeshList);
+            if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
+                scene.remove(sphereX);
+                scene.remove(sphereY);
+                scene.remove(sphereZ);
+                audio.play();
+            }
+        }
+        controls.update();
+
+
+    }
+
+
+    function render() {
+
+        renderer.render(scene, camera);
+
+    }
+
+
+</script>
+</body>
+</html>
